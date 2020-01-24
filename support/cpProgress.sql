@@ -1,0 +1,1 @@
+Select Progress From Cutplans Where SimID = @SimID and CutplanID = @CPID

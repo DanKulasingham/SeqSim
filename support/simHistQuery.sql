@@ -1,0 +1,1 @@
+INSERT INTO simhistory (SimID, Name, UserID, LogGap, Downtime, NumBins, LineSpeed, DefaultCutbacks) VALUES (@SimID, '@Name', @UserID, @LogGap, @Downtime, @NumBins, @LineSpeed, @Cutbacks);

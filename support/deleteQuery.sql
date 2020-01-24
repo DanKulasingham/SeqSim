@@ -1,0 +1,1 @@
+DELETE SimHistory, FullResults FROM SimHistory Left Join FullResults on SimHistory.SimID = FullResults.SimID where SimHistory.SimID = @SimID;

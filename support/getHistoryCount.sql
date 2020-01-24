@@ -1,0 +1,1 @@
+SELECT Count(*) FROM fullresults Left Join simhistory on fullresults.simid = simhistory.simid where shiftid = -1 and fullresults.UserID = @user and SimName Like '%@search%' order by simhistory.timestamp desc;

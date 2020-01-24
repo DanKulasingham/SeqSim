@@ -1,0 +1,1 @@
+INSERT INTO cutplans (SimID, CutplanID, Description, NumLogs) VALUES (@SimID, @CutplanID, '@Description', @NumLogs);

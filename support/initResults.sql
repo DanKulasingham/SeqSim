@@ -1,0 +1,1 @@
+Update Results Set Runtime=0, LogsCut=0, Production=0, LogVolume=0, Recovery=0, LogRate=0, Uptime=0, MSLDowntime=0, BSLDowntime=0, TSLDowntime=0
