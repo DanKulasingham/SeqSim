@@ -35,7 +35,9 @@ class ResultsBar(QProgressBar):
         self.anim.finished.connect(self.animFinished)
 
     def setValue2(self, val, update=True):
-        v = min(100, (val/self.targets[1])*100)
+        v = (val/self.targets[1])*100
+        if v > 99:
+            v = 100
         self.setProperty("value", v)
         self.setValue(v)
         self.updateStyleSheet(v)
@@ -45,7 +47,9 @@ class ResultsBar(QProgressBar):
         self.setValue2(v)
 
     def setActual(self, val):
-        self.actval = min(100, (val/self.targets[1])*100)
+        self.actval = (val/self.targets[1])*100
+        if self.actval > 99:
+            self.actval = 100
         if self.a:
             self.anim.setEndValue(self.actval)
         else:
@@ -96,16 +100,17 @@ class DataWidget(QWidget):
     def __init__(self, parent=None, mult=1, results=None):
         super(DataWidget, self).__init__(parent)
         if results is None:
-            results = [8.0, 2150, 300.0, 638.3, 0.47, 4.48, 0.5, 0.1, 0.2, 0.2]
+            results = [8.0, 2150, 300.0, 638.3, 0.47, 4.48, 0.5, 0.1, 0.2, 0.2,
+                       0.12]
         self.mult = mult
         self.prod = results[2]
-        self.prodTarget = (350.0*mult, 400.0*mult)
+        self.prodTarget = (375.0*mult, 475.0*mult)
         self.logscut = results[1]
         self.logscutTarget = (2100.0*mult, 2400.0*mult)
         self.logvol = results[3]
         self.logvolTarget = (700.0*mult, 800.0*mult)
         self.runtime = results[0]
-        self.runtimeTarget = (4.5*mult, 9.0*mult)
+        self.runtimeTarget = ((530/120)*mult, (530/60)*mult)
         self.recovery = results[4]
         self.recoveryTarget = (0.45, 0.5)
         self.uptime = results[6]
@@ -113,6 +118,7 @@ class DataWidget(QWidget):
         self.msldt = results[7]
         self.bsldt = results[8]
         self.tsldt = results[9]
+        self.sawdust = results[10]
         self.setupUi(parent)
 
     def setupUi(self, Form):
@@ -176,7 +182,11 @@ class DataWidget(QWidget):
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setContentsMargins(0, 20, 0, 0)
         self.horizontalLayout.setObjectName("horizontalLayout")
-        dict = {'Recovery': self.recovery, 'Chip': 0.4, 'Sawdust': 0.13}
+        dict = {
+            'Recovery': self.recovery,
+            'Chip': (1-self.recovery-self.sawdust),
+            'Sawdust': self.sawdust
+        }
         self.recoveryWidget = QtPyChart(dict, self.recoveryTarget, parent=self)
         self.recoveryWidget.setObjectName("recoveryWidget")
         self.horizontalLayout.addWidget(self.recoveryWidget)
@@ -280,6 +290,10 @@ class DataWidget(QWidget):
         self.msldt = results["MSLDT"]
         self.bsldt = results["BSLDT"]
         self.tsldt = results["TSLDT"]
+        if results.isna()["Sawdust"]:
+            self.sawdust = (1-self.recovery)*0.25
+        else:
+            self.sawdust = results["Sawdust"]
         self.LogsCutBar.setActual(self.logscut)
         self.LogsCutValue.setText("{0} logs".format(self.logscut))
         self.LogVolumeBar.setActual(self.logvol)
@@ -289,8 +303,9 @@ class DataWidget(QWidget):
         self.ProductionBar.setActual(self.prod)
         self.ProductionValue.setText("{:.1f} m<sup>3</sup>".format(self.prod))
         rec = self.recovery
+        sd = self.sawdust
         self.recoveryWidget.updateResults(
-            (rec, (1-rec)*0.8, (1-rec)*0.2))
+            (rec, (1-rec-sd), sd))
         self.uptimeWidget.updateResults(
             (self.uptime, self.msldt, self.bsldt, self.tsldt))
 
@@ -403,7 +418,7 @@ class DropdownWidget(QWidget):
         elif results["RunTime"] < 0.1 and self.isButton:
             self.toggleButton()
         v = (results["RunTime"]/self.dataWidget.runtimeTarget[1])*100
-        if v > 100:
+        if v > 99:
             v = 100
         v = int(v)
         self.bar.setProperty(

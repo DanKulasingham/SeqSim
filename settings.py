@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QCheckBox, QSizePolicy, \
     QLabel, QRadioButton, QSpacerItem, QVBoxLayout, QWidget, \
     QAbstractSpinBox, QDialogButtonBox, QPushButton
 from PyQt5.QtGui import QCursor
-from mysql.connector import connect as mysqlconnect
+from mysql import connector
 from pandas import read_sql
 
 
@@ -27,15 +27,15 @@ class SettingsWindow(QWidget):
         self.default = defaultsettings
         self.defaultcutbacks = defaultcutbacksettings
 
-        db = mysqlconnect(
+        db = connector.connect(
             host=self.host, user="root", passwd="Sequal1234",
-            database="simulation"
+            database="simulation", use_pure=True
         )
         buttonSS = "QPushButton {\n" \
             "    background-color: ;\n" \
             "    background-color: qlineargradient(spread:pad, x1:0, y1:0, " \
             "x2:1, y2:1, stop:0 rgba(0, 115, 119, 255), stop:1 rgb(4, 147, " \
-            "131, 255));\n" \
+            "131));\n" \
             "    color: white;\n" \
             "    height: 25px;\n" \
             "    border: None;\n" \
@@ -216,6 +216,7 @@ class SettingsWindow(QWidget):
             self.autospeedRB.setChecked(True)
         if defaultsettings[0] > 0:
             self.loggapTB.setValue(defaultsettings[0])
+            self.loggapAuto.setChecked(False)
         else:
             self.loggapAuto.setChecked(True)
         self.numbinsTB.setValue(defaultsettings[2])
@@ -266,7 +267,6 @@ class SettingsWindow(QWidget):
         self.resetbutton.setVisible(True)
 
     def setupReadOnly(self):
-        self.resetbutton.setVisible(False)
         self.highspeedRB.setDisabled(True)
         self.lowspeedRB.setDisabled(True)
         self.autospeedRB.setDisabled(True)
@@ -281,6 +281,7 @@ class SettingsWindow(QWidget):
         self.downtimeCBall.setDisabled(True)
         for cb in self.cutbackCBs:
             cb.setDisabled(True)
+        self.resetbutton.setVisible(False)
 
     def retranslateUi(self, Form):
         _translate = QCoreApplication.translate

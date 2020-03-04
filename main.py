@@ -19,8 +19,7 @@ from os.path import exists as pathexists
 from os import environ
 from subprocess import check_output, CalledProcessError
 from configparser import ConfigParser
-from mysql.connector import connect as mysqlconnect
-from mysql.connector.errors import DatabaseError
+from mysql import connector
 
 
 class NewUserPopup(QDialog):
@@ -31,8 +30,8 @@ class NewUserPopup(QDialog):
         Form.resize(320, 180)
         Form.setStyleSheet("QDialog {\nbackground-color: qlineargradient("
                            "spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 "
-                           "rgba(0, 115, 119, 255), stop:1 rgb(4, 147, 131, "
-                           "255));\n}")
+                           "rgba(0, 115, 119, 255), stop:1 rgb(4, 147, 131));"
+                           "\n}")
 
         self.vlayout = QVBoxLayout(Form)
         vspacer = QSpacerItem(
@@ -328,7 +327,7 @@ class Ui_MainWindow(object):
             msgBox.setDefaultButton(QMessageBox.No)
             msgBox.setIcon(QMessageBox.Warning)
             self.HistoryButton.setSelected(True)
-            r = msgBox.exec()
+            r = msgBox.exec_()
 
             if r == QMessageBox.No:
                 self.HistoryButton.setSelected(False)
@@ -362,7 +361,7 @@ class Ui_MainWindow(object):
         _translate = QCoreApplication.translate
         MainWindow.setWindowTitle(_translate(
             "MainWindow",
-            "SeqSim — Sequal Simulation Software"))
+            "SeqSim — Sequal Simulator"))
         self.SimulationButton.setText(_translate("MainWindow", "Simulation"))
         self.HistoryButton.setText(_translate("MainWindow", "History"))
         # self.SettingsButton.setText(_translate("MainWindow", "Settings"))
@@ -384,9 +383,9 @@ class Ui_MainWindow(object):
 
 if __name__ == "__main__":
     import sys
+    sys.setrecursionlimit(5000)
     environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     app = QApplication(sys.argv)
-    app.setAttribute(Qt.AA_EnableHighDpiScaling)
 
     pixmap = QPixmap('images\\splash.png')
     splash = QSplashScreen(pixmap)
@@ -403,13 +402,17 @@ if __name__ == "__main__":
     splash.showMessage('Checking network connection...',
                        alignment=Qt.AlignHCenter, color=Qt.white)
     app.processEvents()
+    failed = False
     try:
-        db = mysqlconnect(
+        db = connector.connect(
             host="192.168.2.171", user="root", passwd="Sequal1234",
-            database="simulation", connect_timeout=2
+            database="simulation", connect_timeout=2, use_pure=True
         )
         check_output("ping -n 1 -w 2000 192.168.3.55", shell=True)
-    except (CalledProcessError, DatabaseError):
+    except (CalledProcessError, connector.errors.OperationalError):
+        failed = True
+
+    if failed:
         msgbox = QMessageBox(MainWindow)
         msgbox.setWindowTitle('Network Error')
         msgbox.setText('Network connection required.')
@@ -420,7 +423,7 @@ if __name__ == "__main__":
         msgbox.setIcon(QMessageBox.Critical)
         msgbox.setStyleSheet("#qt_msgbox_label {font-weight: bold;}")
         msgbox.show()
-        sys.exit(msgbox.exec())
+        sys.exit(msgbox.exec_())
 
     splash.showMessage('Checking user settings...',
                        alignment=Qt.AlignHCenter, color=Qt.white)
@@ -440,9 +443,9 @@ if __name__ == "__main__":
         username = ui.username
         host = '192.168.2.171'
 
-        db = mysqlconnect(
+        db = connector.connect(
             host=host, user="root", passwd="Sequal1234",
-            database="simulation"
+            database="simulation", use_pure=True
         )
         db.autocommit = True
         query = "SELECT UserID From Users Where " \
@@ -485,3 +488,4 @@ if __name__ == "__main__":
     splash.finish(MainWindow)
 
     sys.exit(app.exec_())
+    app.setAttribute(Qt.AA_EnableHighDpiScaling)

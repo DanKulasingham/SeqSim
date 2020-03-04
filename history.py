@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import \
     QLineEdit, QSizePolicy, QApplication, QTableWidget, QTableWidgetItem, \
     QHeaderView, QAbstractItemView, QScrollArea, QFrame, QMessageBox
 from PyQt5.QtGui import QFont, QIcon, QCursor, QMovie, QColor, QBrush, QPixmap
-from mysql.connector import connect as mysqlconnect
+from mysql import connector
 from math import ceil
 from pandas import read_sql
 from seqsim.helper import DrawCutplan
@@ -30,6 +30,7 @@ class ToolButtonID(QToolButton):
 class HistoryLoader(QObject):
     pageLoaded = pyqtSignal()
     cutplanLoaded = pyqtSignal(int, int)
+    cploadfinish = pyqtSignal()
 
     def __init__(self, host, userid, page=1, search=""):
         super(HistoryLoader, self).__init__()
@@ -47,9 +48,9 @@ class HistoryLoader(QObject):
     @pyqtSlot()
     def loadPage(self):
         self.quit = False
-        db = mysqlconnect(
+        db = connector.connect(
             host=self.host, user="root", passwd="Sequal1234",
-            database="simulation"
+            database="simulation", use_pure=True
         )
         with open('support\\getHistory.sql', 'r') as f:
             qry = f.read()
@@ -91,6 +92,7 @@ class HistoryLoader(QObject):
 
     def cpload(self, i, j):
         if i >= len(self.cps):
+            self.cploadfinish.emit()
             return
         if j == self.cps[i].shape[0]:
             j = 0
@@ -99,6 +101,7 @@ class HistoryLoader(QObject):
             return
         if self.quit:
             self.quit = False
+            self.cploadfinish.emit()
             return
         cid = 10000 + i*100 + j
         qry = self.sqltext.replace('@CPID', str(self.cps[i].ID[j]))
@@ -208,9 +211,9 @@ class HistoryPage(QWidget):
         self.ogcol = QColor(0, 0, 0, 0)
         self.hlcol = QColor(192, 221, 221)
 
-        self.db = mysqlconnect(
+        self.db = connector.connect(
             host=self.host, user="root", passwd="Sequal1234",
-            database="simulation"
+            database="simulation", use_pure=True
         )
         self.db.autocommit = True
 
@@ -225,7 +228,7 @@ class HistoryPage(QWidget):
             "QToolButton {\n"
             "	background-color: qlineargradient(spread:pad, x1:0, y1:0, "
             "x2:1, y2:1, stop:0 rgba(0, 115, 119, 255), stop:1 rgb(4, 147, "
-            "131, 255));\n"
+            "131));\n"
             "	color: white;\n"
             "	border: None;\n"
             "	border-radius: 2px;\n"
@@ -385,7 +388,12 @@ class HistoryPage(QWidget):
         self.thread.started.connect(self.loader.loadPage)
         self.loader.pageLoaded.connect(self.setupTable)
         self.loader.cutplanLoaded.connect(self.loaderCP)
+        self.loader.cploadfinish.connect(self.loaderFinish)
         self.thread.start()
+
+    def loaderFinish(self):
+        self.thread.quit()
+        self.thread.terminate()
 
     def configPagesShown(self):
         totalpages = self.loader.totalpages
@@ -514,9 +522,9 @@ class HistoryPage(QWidget):
 
         with open('support\\deleteQuery.sql', 'r') as f:
             query = f.read().replace('@SimID', str(self.loader.data.SimID[id]))
-        db = mysqlconnect(
+        db = connector.connect(
             host=self.host, user="root", passwd="Sequal1234",
-            database="simulation"
+            database="simulation", use_pure=True
         )
         cursor = db.cursor()
         cursor.execute(query)

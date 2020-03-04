@@ -2,7 +2,6 @@ from PyQt5.QtCore import QVariant, Qt, QSize, QRect, QModelIndex, \
     QVariantAnimation, QEasingCurve, QAbstractTableModel
 from PyQt5.QtWidgets import QWidget, QSizePolicy, QApplication, QHBoxLayout
 from PyQt5.QtGui import QPainter, QPen, QColor, QFont, QFontMetrics
-from pandas import DataFrame
 from math import floor
 from random import random
 from itertools import groupby
@@ -236,7 +235,7 @@ class QtPyChart(QWidget):
         self.targets = targets
         self.v = 0
         self.anim = QVariantAnimation(self)
-        self.anim.setEasingCurve(QEasingCurve.OutBounce)
+        self.anim.setEasingCurve(QEasingCurve.OutQuint)
         self.anim.setDuration(2000)
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)

@@ -15,7 +15,7 @@ from cutplan import CutplanWidget
 from results import ResultsWidget
 from os import getcwd
 from pandas import DataFrame, read_sql
-from mysql.connector import connect as mysqlconnect, Error as mysqlError
+from mysql import connector
 from addWindow import AddCutplanDialog
 from settings import SettingsWindow
 
@@ -32,9 +32,9 @@ class SimulationPage(QWidget):
         self.currentindex = 0
         self.usedefaultsettings = True
 
-        self.db = mysqlconnect(
+        self.db = connector.connect(
             host=self.host, user="root", passwd="Sequal1234",
-            database="simulation"
+            database="simulation", use_pure=True
         )
         self.db.autocommit = True
         self.simrunning = False
@@ -51,7 +51,8 @@ class SimulationPage(QWidget):
             index.append(str(i))
         index.append("Total")
         cols = ["RunTime", "LogsCut", "Production", "LogVolume",
-                "Recovery", "LogRate", "Uptime", "MSLDT", "BSLDT", "TSLDT"]
+                "Recovery", "LogRate", "Uptime", "MSLDT", "BSLDT", "TSLDT",
+                "SawdustVol"]
         self.results = DataFrame(index=index, columns=cols)
 
         # self.OpenExtendSim()
@@ -71,7 +72,7 @@ class SimulationPage(QWidget):
             QToolButton {
                 background-color: qlineargradient(spread:pad,
                     x1:0, y1:0, x2:1, y2:1, stop:0 rgba(0, 115,
-                    119, 255), stop:1 rgb(4, 147,131, 255));
+                    119, 255), stop:1 rgb(4, 147, 131));
                 color: white;
                 border: None;
                 border-radius: 2px;
@@ -226,7 +227,7 @@ class SimulationPage(QWidget):
         Form.setWindowTitle(_translate("Form", "Form"))
 
     def ThreadSetup(self, show):
-        # self.PlayButton.setVisible(show)
+        self.PlayButton.setVisible(False)
         self.cpid = 0
         self.cpfinish = False
         for i in range(self.results.shape[0]):
@@ -274,10 +275,10 @@ class SimulationPage(QWidget):
     def SendData(self):
         try:
             cursor = self.db.cursor()
-        except mysqlError:
-            self.db = mysqlconnect(
+        except connector.Error:
+            self.db = connector.connect(
                 host=self.host, user="root", passwd="Sequal1234",
-                database="simulation"
+                database="simulation", use_pure=True
             )
             self.db.autocommit = True
             cursor = self.db.cursor()
@@ -401,6 +402,12 @@ class SimulationPage(QWidget):
         self.usedefaultsettings = not s.resetbutton.isVisible()
 
         self.showsettings = False
+        speed = int(self.linespeed_setting)
+        if speed == -1:
+            speed = 55
+        self.Cutplans.speedsetting = speed
+        self.Cutplans.onClick2()
+        self.Cutplans.AddCP()
         self.StackedLayout.setCurrentIndex(self.currentindex)
 
     def SendSettings(self):
@@ -443,10 +450,10 @@ class SimulationPage(QWidget):
             sqltext = f.read().replace('@SimID', str(self.simid))
             try:
                 cursor = self.db.cursor()
-            except mysqlError:
-                self.db = mysqlconnect(
+            except connector.Error:
+                self.db = connector.connect(
                     host=self.host, user="root", passwd="Sequal1234",
-                    database="simulation"
+                    database="simulation", use_pure=True
                 )
                 self.db.autocommit = True
                 cursor = self.db.cursor()
@@ -466,7 +473,7 @@ class SimulationPage(QWidget):
             sqltext = f.read()
             self.results = read_sql(sqltext, self.db)
             self.ResultsWidget.updateResults(self.results)
-            if self.results['RunTime'][2] >= 18:
+            if self.results['RunTime'][2] >= 17.66:
                 self.timer.stop()
                 self.simrunning = False
                 self.setupPostSimulation()
@@ -476,13 +483,27 @@ class SimulationPage(QWidget):
         self.nameTextbox.setDisabled(True)
         self.CreateNewButton.setVisible(True)
 
+        ss = "    background-color: ;\n" \
+             "    background-color: qlineargradient(spread:pad, x1:0, y1:0, " \
+             "x2:1, y2:1, stop:0 rgba(0, 115, 119, 255), stop:1 rgb(4, 147, " \
+             "131));\n" \
+             "    color: white;\n" \
+             "    height: 25px;\n" \
+             "    border: None;\n" \
+             "    border-radius: 2px;\n" \
+             "    \n" \
+             "    font: 11pt \"Tahoma\";\n" \
+             "    width: 70px;"
+
         # SETTINGS READ ONLY
         self.SettingsUI.buttonbox.setStandardButtons(
             QDialogButtonBox.Cancel)
         for w in self.SettingsUI.buttonbox.children():
             if w.metaObject().className() == "QPushButton":
                 w.setCursor(QCursor(Qt.PointingHandCursor))
+                w.setStyleSheet(ss)
         self.SettingsUI.setupReadOnly()
+        self.CheckCPErrors()
 
     def setupReadOnly(self, loadcp=True):
         self.closeButton.setVisible(True)
@@ -495,18 +516,20 @@ class SimulationPage(QWidget):
         qry = "SELECT CutplanID as ID, NumLogs as \"Log Count\" From " + \
               "cutplans WHERE SimID = " + str(self.simid)
 
-        self.results = data.iloc[:, 3:14].copy()
+        self.results = data.iloc[:, 3:15].copy()
         self.results.columns = ['RunTime', 'LogsCut', 'Production',
                                 'LogVolume', 'Recovery', 'LogRate', 'Uptime',
-                                'MSLDT', 'BSLDT', 'TSLDT', 'Shift']
+                                'MSLDT', 'BSLDT', 'TSLDT', 'Sawdust', 'Shift']
         self.results.loc[
             self.results.index[0], 'Shift'] = self.results.shape[0]
         self.results = self.results.sort_values(by=['Shift'])
+        self.results['Sawdust'] = self.results['Sawdust'] / \
+            self.results['LogVolume']
         self.ResultsWidget.updateResults(self.results)
 
         if loadcp:
             cpdata = read_sql(qry, self.db)
-            self.Cutplans.AddCP(addData=cpdata)
+            self.Cutplans.AddCP(addData=cpdata, errors=self.CheckCPErrors())
 
         qry = "SELECT * From SimHistory Where SimID = " + str(self.simid) + ";"
         settings = read_sql(qry, self.db)
@@ -551,6 +574,13 @@ class SimulationPage(QWidget):
             if w.metaObject().className() == "QPushButton":
                 w.setCursor(QCursor(Qt.PointingHandCursor))
         self.SettingsUI.setupReadOnly()
+
+    def CheckCPErrors(self):
+        with open('support\\cpErrors.sql', 'r') as f:
+            query = f.read().replace('@SimID', str(self.simid))
+        cperrors = read_sql(query, self.db)
+
+        return cperrors
 
 
 if __name__ == "__main__":

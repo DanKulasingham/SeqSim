@@ -32,6 +32,8 @@ class CutplanLoader(QObject):
         self.logcount = None
         self.data = None
         self.des = None
+        self.errors = None
+        self.speeds = []
 
     @pyqtSlot()
     def loadCutplan(self):
@@ -50,8 +52,14 @@ class CutplanLoader(QObject):
         self.des = read_sql(
             "Select Description From Logs Where Left(Description,7)=\'"
             + des + "\'", conn)
-        DrawCutplan(conn, self.data.iloc[0], self.id+1, folder=imgfolder,
-                    logs=self.logcount)
+
+        if self.errors is None:
+            e = None
+        else:
+            e = self.errors[self.id]
+        s = DrawCutplan(conn, self.data.iloc[0], self.id+1, folder=imgfolder,
+                        logs=self.logcount, errors=e)
+        self.speeds.append(s)
 
         self.cutplanloaded.emit(self.id)
 
@@ -65,6 +73,7 @@ class CPProgress(QWidget):
         self.size = size
         self.v = 100
         self.setMouseTracking(True)
+        self.c = (255, 255, 255)
 
     @pyqtSlot()
     def enterEvent(self, event):
@@ -82,7 +91,7 @@ class CPProgress(QWidget):
             return
 
         p = QPainter(self)
-        brush = QBrush(QColor(255, 255, 255, 127))
+        brush = QBrush(QColor(self.c[0], self.c[1], self.c[1], 127))
         p.setBrush(brush)
         pen = QPen()
         pen.setStyle(Qt.NoPen)
@@ -144,6 +153,7 @@ class CutplanWidget(QWidget):
         self.CPNum = 0
         self.CPMinSize = 0
         self.size = size
+        self.speedsetting = 55
 
         Form.setObjectName("Form")
         Form.setMaximumWidth(self.size)
@@ -256,10 +266,13 @@ class CutplanWidget(QWidget):
         self.CPLoads = []
         self.data = None
 
-    def AddCP(self, addData=None):
+    def AddCP(self, addData=None, errors=None):
         if addData is not None:
             # this happens when we're in popup read-only mode
             self.addData = addData
+        if self.addData is None:
+            self.newcutplans.emit(False)
+            return
 
         self.DeleteCP()
         if self.addData.shape[0] == 0:
@@ -279,6 +292,7 @@ class CutplanWidget(QWidget):
         self.data = read_sql(sqltext, conn)
 
         self.CPNum = self.addData.shape[0]
+        self.CPErrors = []
         QApplication.setOverrideCursor(
             QCursor(Qt.WaitCursor))
         for id in range(self.CPNum):
@@ -291,6 +305,18 @@ class CutplanWidget(QWidget):
             self.CPLoads[id].setMovie(movie)
             movie.start()
             self.CPLayout.addWidget(self.CPLoads[id])
+            self.CPErrors.append(False)
+
+        if errors is not None:
+            e = []
+            for i in range(errors.shape[0]):
+                e.append(list(errors.iloc[i]))
+                for j in range(errors.shape[1]):
+                    if errors.iloc[i, j] > 0:
+                        self.CPErrors[i] = True
+                        break
+            self.loader.errors = e
+
         self.loader.id = 0
         self.loader.cutplanid = self.addData.ID[0]
         self.loader.logcount = self.addData['Log Count'][0]
@@ -309,6 +335,9 @@ class CutplanWidget(QWidget):
     def AddOneCP(self, id):
         imgfolder = "images\\cps\\"
         data = self.loader.data
+        speed = self.loader.speeds[id]
+        if speed > self.speedsetting:
+            speed = self.speedsetting
 
         widget = QWidget(self)
         widget.setObjectName('CPW'+str(id+1))
@@ -352,12 +381,18 @@ class CutplanWidget(QWidget):
         self.CPProgress[id].setObjectName('CPP'+str(id+1))
         self.CPProgress[id].setGeometry(
             QRect(0, 0, self.size, self.size))
+        if self.CPErrors[id]:
+            self.CPProgress[id].c = (255, 121, 121)
+            self.CPProgress[id].setValue(0)
+        else:
+            self.CPProgress[id].c = (255, 255, 255)
+            self.CPProgress[id].setValue(100)
 
         self.CPLabels.append(QLabel(widget))
         self.CPLabels[id].setObjectName('CPL'+str(id+1))
         self.CPLabels[id].setGeometry(QRect(10, 200, 60, 30))
         font = QFont()
-        font.setPointSize(7)
+        font.setPointSize(6)
         font.setBold(True)
         font.setFamily("Tahoma")
         self.CPLabels[id].setFont(font)
@@ -377,7 +412,9 @@ class CutplanWidget(QWidget):
         if desPD.shape[0] > 0:
             des = desPD.Description[0]
             self.CPLabels[id].setText(
-                des[5:10]+"cm\n{:.1f}m".format(float(des[0:3])-0.1))
+                des[5:10]+" cm\n{:.1f} m\n".format(float(des[0:3])-0.1)
+                + "{0} m/min".format(speed)
+            )
             self.CPLayout.insertWidget(id*2, widget)
             self.CPLoads[id].setVisible(False)
             self.setMinimumSize(QSize(
@@ -400,9 +437,12 @@ class CutplanWidget(QWidget):
             self.thread.wait()
             self.loader.id = id+1
             self.loader.cutplanid = self.addData.ID[id+1]
-            self.loader.logcount = self.addData['Log Count'][0]
+            self.loader.logcount = self.addData['Log Count'][id+1]
             self.thread.start()
         else:
+            self.thread.quit()
+            self.thread.terminate()
+            self.loader.errors = None
             self.cploadfinish.emit()
 
     def onHover(self, hover, id):

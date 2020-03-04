@@ -273,7 +273,7 @@ background: none;
             "QToolButton {\n"\
             "	background-color: qlineargradient(spread:pad, x1:0, y1:0, "\
             "x2:1, y2:1, stop:0 rgba(0, 115, 119, 255), stop:1 rgb(4, 147, "\
-            "131, 255));\n"\
+            "131));\n"\
             "	color: white;\n"\
             "	border: None;"\
             "	border-radius: 2px;"\
@@ -333,7 +333,7 @@ background: none;
             "    background-color: ;\n"
             "    background-color: qlineargradient(spread:pad, x1:0, y1:0, "
             "x2:1, y2:1, stop:0 rgba(0, 115, 119, 255), stop:1 rgb(4, 147, "
-            "131, 255));\n"
+            "131));\n"
             "    color: white;\n"
             "    width: 70px;\n"
             "    height: 25px;\n"

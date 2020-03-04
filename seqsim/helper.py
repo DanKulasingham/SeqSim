@@ -234,7 +234,7 @@ def Timer(ic, il, total, elapsed, tl=1000):
 def DrawCutplan(conn, c, id, colour=(255, 255, 255),
                 folder="images\\cps\\",
                 gradImg="images\\gradient.png",
-                highlight=True, logs=None):
+                highlight=True, logs=None, errors=None):
     if logs is None:
         logs = c.LogCount
 
@@ -268,19 +268,46 @@ def DrawCutplan(conn, c, id, colour=(255, 255, 255),
         font = ImageFont.truetype("tahomabd.ttf", 45)
         font2 = ImageFont.truetype("tahoma.ttf", 39)
         draw = ImageDraw.Draw(h_fullimg)
-        tw, th = draw.textsize(c.Description, font=font)
+        tw1, th1 = draw.textsize(c.Description, font=font)
         lstr = str(logs) + " logs"
         tw2, th2 = draw.textsize(lstr, font=font2)
+        ohx = (wh+th1-th2)/2
+        if errors is not None:
+            font3 = ImageFont.truetype("fonts\\tahoma.ttf", 30)
+            font4 = ImageFont.truetype("fonts\\symbola.ttf", 35)
+            font5 = ImageFont.truetype("fonts\\symbola.ttf", 28)
+            tsw, tsh = draw.textsize("⬤", font=font4)
+            tew, teh = draw.textsize("✘", font=font5)
+            tw, th = draw.textsize("P. Sawbox Trip", font=font3)
+            tw -= tsw - 10
+            estrs = ["P. Profiler Trip", "P. Sawbox Trip",
+                     "S. Profiler Trip", "S. Sawbox Trip"]
+            numerrors = sum([1 for i in errors if i > 0])
+            ohx = (wh+th1-th2)/2 - numerrors*(tsh+1)/3
+            hx = ohx + 20
+            for i in range(len(errors)):
+                if errors[i] > 0:
+                    estr = estrs[i]
+                    draw.text(((wh-tw)/2, hx+tsh+(tsh-th)/2), estr,
+                              (0, 115, 119), font=font3)
+                    draw.text(((wh-tw)/2-tsw-10, hx+tsh), "⬤",
+                              (0, 115, 119), font=font4)
+                    draw.text(((wh-tw-tsw-tew)/2-10, hx+tsh+(tsh-tew)/3), "✘",
+                              (255, 255, 255), font=font5)
+                    hx += tsh + 1
         draw.text(
-            ((wh-tw)/2, (wh-th-th2)/2),
+            ((wh-tw1)/2, ohx-th1),
             c.Description, (0, 115, 119), font=font)
-        draw.text(((wh-tw2)/2, (wh+th-th2)/2), lstr, (0, 115, 119), font=font2)
+        draw.text(
+            ((wh-tw2)/2, ohx),
+            lstr, (0, 115, 119), font=font2)
         h_fullimg = Image.blend(fullimg, h_fullimg, 0.65)
 
     fullimg.save(folder+'CP'+str(id)+'.png', 'PNG')
     if highlight:
         h_fullimg.save(folder+'CP'+str(id)+'_h.png', 'PNG')
 
+    return FindSpeed(c)
 
 def DrawPrimary(c, draw, wh, s, colour):
     cantW = c.CBWidth
@@ -310,6 +337,17 @@ def DrawPrimary(c, draw, wh, s, colour):
 
 def DrawSecondary(c, draw, wh, s, colour):
     cantH = sum(c[14:24]) + c.SecK*(c.CBNum-1)
+    offset = (
+        (c.SecInThickT > 0)*(c.SecInThickT+c.SecK)
+        + c.SecInSplitT*(c.SecInThickT+c.SecK)
+        + (c.SecOutThickT > 0)*(c.SecOutThickT+c.SecK)
+        + c.SecOutSplitT*(c.SecOutThickT+c.SecK)
+    ) - (
+        (c.SecInThickB > 0)*(c.SecInThickB+c.SecK)
+        + c.SecInSplitB*(c.SecInThickB+c.SecK)
+        + (c.SecOutThickB > 0)*(c.SecOutThickB+c.SecK)
+        + c.SecOutSplitB*(c.SecOutThickB+c.SecK)
+    )
 
     def getXY(x, y, w, h):
         xy = [
@@ -323,7 +361,7 @@ def DrawSecondary(c, draw, wh, s, colour):
             return (y1+h1+k)
         return y1
 
-    cH = cantH/2
+    cH = cantH/2-offset/2
     cH = drawRecY(cH, c.SecInWidth, c.SecInThickT, c.SecK, -1)
     if (c.SecInSplitT):
         cH = drawRecY(cH, c.SecInWidth, c.SecInThickT, c.SecK, -1)
@@ -332,7 +370,7 @@ def DrawSecondary(c, draw, wh, s, colour):
     if (c.SecOutSplitT):
         cH = drawRecY(cH, c.SecOutWidth, c.SecOutThickT, c.SecK, -1)
 
-    cH = cantH/2
+    cH = cantH/2+offset/2
     cH = drawRecY(cH, c.SecInWidth, c.SecInThickB, c.SecK, 1)
     if (c.SecInSplitB):
         cH = drawRecY(cH, c.SecInWidth, c.SecInThickB, c.SecK, 1)
@@ -344,6 +382,17 @@ def DrawSecondary(c, draw, wh, s, colour):
 
 def DrawCB(c, draw, wh, s, colour):
     cantH = sum(c[14:24]) + c.SecK*(c.CBNum-1)
+    offset = (
+        (c.SecInThickT > 0)*(c.SecInThickT+c.SecK)
+        + c.SecInSplitT*(c.SecInThickT+c.SecK)
+        + (c.SecOutThickT > 0)*(c.SecOutThickT+c.SecK)
+        + c.SecOutSplitT*(c.SecOutThickT+c.SecK)
+    ) - (
+        (c.SecInThickB > 0)*(c.SecInThickB+c.SecK)
+        + c.SecInSplitB*(c.SecInThickB+c.SecK)
+        + (c.SecOutThickB > 0)*(c.SecOutThickB+c.SecK)
+        + c.SecOutSplitB*(c.SecOutThickB+c.SecK)
+    )
     cantW = c.CBWidth
 
     def getXY(x, y, w, h):
@@ -352,7 +401,7 @@ def DrawCB(c, draw, wh, s, colour):
         ]
         return xy
 
-    cH = 0
+    cH = offset/2
     hsK = list(c[41:])
     hsK.append(0)
     for i in range(c.CBNum):
@@ -444,3 +493,7 @@ def ConvertCutplans(Cutplan, ChangeBV=False):
             tempC.loc[i, 'BoardVol'] = bVol
 
     return tempC
+
+
+def FindSpeed(c):
+    return 55

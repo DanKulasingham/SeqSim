@@ -1,0 +1,1 @@
+Select PPTrip, PSTrip, SPTrip, SSTrip From Cutplans Where SimID = @SimID
